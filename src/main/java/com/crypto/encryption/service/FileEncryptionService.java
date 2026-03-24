@@ -189,32 +189,86 @@ public class FileEncryptionService {
     }
 
     /**
-     * Reconstruct public key from PEM
-     */
-    private PublicKey reconstructPublicKey(String publicKeyPEM) throws Exception {
-        String publicKeyContent = publicKeyPEM
-                .replace("-----BEGIN PUBLIC KEY-----", "")
-                .replace("-----END PUBLIC KEY-----", "")
-                .replaceAll("\\s", "");
-
-        byte[] decodedKey = Base64.getDecoder().decode(publicKeyContent);
-        X509EncodedKeySpec spec = new X509EncodedKeySpec(decodedKey);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        return keyFactory.generatePublic(spec);
-    }
-
-    /**
-     * Reconstruct private key from PEM
+     * Reconstruct private key from PEM - FIXED VERSION
      */
     private PrivateKey reconstructPrivateKey(String privateKeyPEM) throws Exception {
+        log.debug("Reconstructing private key from PEM...");
+
+        // Remove PEM headers
         String privateKeyContent = privateKeyPEM
                 .replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
-                .replaceAll("\\s", "");
+                .replace("-----BEGIN RSA PRIVATE KEY-----", "")
+                .replace("-----END RSA PRIVATE KEY-----", "")
+                .trim();  // ✅ Add trim()
 
-        byte[] decodedKey = Base64.getDecoder().decode(privateKeyContent);
-        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(decodedKey);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        return keyFactory.generatePrivate(spec);
+        // Remove all whitespace (spaces, newlines, tabs, etc.)
+        privateKeyContent = privateKeyContent.replaceAll("\\s+", "");
+
+        log.debug("Private key content length: {}", privateKeyContent.length());
+
+        try {
+            // Decode from Base64
+            byte[] decodedKey = Base64.getDecoder().decode(privateKeyContent);
+            log.debug("Decoded key length: {} bytes", decodedKey.length);
+
+            // Create KeySpec
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(decodedKey);
+
+            // Generate PrivateKey
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            PrivateKey privateKey = keyFactory.generatePrivate(spec);
+
+            log.debug("✓ Private key reconstructed successfully");
+            return privateKey;
+        } catch (IllegalArgumentException e) {
+            log.error("❌ Invalid Base64 format: {}", e.getMessage());
+            log.error("❌ Key content (first 100 chars): {}", privateKeyContent.substring(0, Math.min(100, privateKeyContent.length())));
+            throw new RuntimeException("Invalid private key format: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("❌ Error reconstructing private key: {}", e.getMessage());
+            throw new RuntimeException("Failed to reconstruct private key: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Reconstruct public key from PEM - FIXED VERSION
+     */
+    private PublicKey reconstructPublicKey(String publicKeyPEM) throws Exception {
+        log.debug("Reconstructing public key from PEM...");
+
+        // Remove PEM headers
+        String publicKeyContent = publicKeyPEM
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .trim();  // ✅ Add trim()
+
+        // Remove all whitespace
+        publicKeyContent = publicKeyContent.replaceAll("\\s+", "");
+
+        log.debug("Public key content length: {}", publicKeyContent.length());
+
+        try {
+            // Decode from Base64
+            byte[] decodedKey = Base64.getDecoder().decode(publicKeyContent);
+            log.debug("Decoded key length: {} bytes", decodedKey.length);
+
+            // Create KeySpec
+            X509EncodedKeySpec spec = new X509EncodedKeySpec(decodedKey);
+
+            // Generate PublicKey
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            PublicKey publicKey = keyFactory.generatePublic(spec);
+
+            log.debug("✓ Public key reconstructed successfully");
+            return publicKey;
+        } catch (IllegalArgumentException e) {
+            log.error("❌ Invalid Base64 format: {}", e.getMessage());
+            log.error("❌ Key content (first 100 chars): {}", publicKeyContent.substring(0, Math.min(100, publicKeyContent.length())));
+            throw new RuntimeException("Invalid public key format: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("❌ Error reconstructing public key: {}", e.getMessage());
+            throw new RuntimeException("Failed to reconstruct public key: " + e.getMessage(), e);
+        }
     }
 }
