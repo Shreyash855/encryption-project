@@ -241,7 +241,7 @@ public class FileEncryptionService {
         String publicKeyContent = publicKeyPEM
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
-                .trim();  // ✅ Add trim()
+                .trim();  //  Add trim()
 
         // Remove all whitespace
         publicKeyContent = publicKeyContent.replaceAll("\\s+", "");
@@ -263,11 +263,11 @@ public class FileEncryptionService {
             log.debug("✓ Public key reconstructed successfully");
             return publicKey;
         } catch (IllegalArgumentException e) {
-            log.error("❌ Invalid Base64 format: {}", e.getMessage());
-            log.error("❌ Key content (first 100 chars): {}", publicKeyContent.substring(0, Math.min(100, publicKeyContent.length())));
+            log.error("Invalid Base64 format: {}", e.getMessage());
+            log.error("Key content (first 100 chars): {}", publicKeyContent.substring(0, Math.min(100, publicKeyContent.length())));
             throw new RuntimeException("Invalid public key format: " + e.getMessage(), e);
         } catch (Exception e) {
-            log.error("❌ Error reconstructing public key: {}", e.getMessage());
+            log.error("Error reconstructing public key: {}", e.getMessage());
             throw new RuntimeException("Failed to reconstruct public key: " + e.getMessage(), e);
         }
     }
