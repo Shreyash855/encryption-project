@@ -2,6 +2,8 @@ package com.crypto.encryption.controller;
 
 import com.crypto.encryption.dto.EncryptedFileResponse;
 import com.crypto.encryption.dto.FileDecryptionResponse;
+import com.crypto.encryption.model.EncryptedFile;
+import com.crypto.encryption.repository.EncryptedFileRepository;
 import com.crypto.encryption.service.FileEncryptionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ContentDisposition;
@@ -22,9 +24,11 @@ import java.util.Map;
 public class FileOperationController {
 
     private final FileEncryptionService fileEncryptionService;
+    private final EncryptedFileRepository encryptedFileRepository;
 
-    public FileOperationController(FileEncryptionService fileEncryptionService) {
+    public FileOperationController(FileEncryptionService fileEncryptionService, EncryptedFileRepository encryptedFileRepository) {
         this.fileEncryptionService = fileEncryptionService;
+        this.encryptedFileRepository = encryptedFileRepository;
     }
 
     /**
@@ -95,6 +99,60 @@ public class FileOperationController {
         }
     }
 
+    /**
+     * Download encrypted file (raw encrypted bytes without decryption)
+     * Other users can use this encrypted file to decrypt with their copy of the private key
+     * POST /files/{fileId}/download-encrypted
+     */
+    @PostMapping("/{fileId}/download-encrypted")
+    public ResponseEntity<?> downloadEncryptedFile(@PathVariable Long fileId) {
+        log.info("📥 Downloading encrypted file: {}", fileId);
+
+        try {
+            // Get encrypted file from database
+            EncryptedFile encryptedFile = encryptedFileRepository.findById(fileId)
+                    .orElseThrow(() -> new RuntimeException("File not found: " + fileId));
+
+            log.info("✓ Found encrypted file: {}", encryptedFile.getOriginalFilename());
+
+            // Get encrypted data
+            byte[] encryptedData = encryptedFile.getEncryptedData();
+
+            if (encryptedData == null || encryptedData.length == 0) {
+                log.error("❌ Encrypted data is empty for file: {}", fileId);
+                Map<String, Object> error = new HashMap<>();
+                error.put("status", "ERROR");
+                error.put("message", "Encrypted file data is empty");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+            }
+
+            log.info("✓ Encrypted data size: {} bytes", encryptedData.length);
+
+            // Return encrypted file as downloadable blob
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + encryptedFile.getOriginalFilename() + ".enc\"")
+                    .header(HttpHeaders.CONTENT_TYPE, "application/octet-stream")
+                    .body(encryptedData);
+
+        } catch (RuntimeException e) {
+            log.error("❌ Error downloading encrypted file: {}", e.getMessage());
+
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", "ERROR");
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+        } catch (Exception e) {
+            log.error("❌ Error downloading encrypted file", e);
+
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", "ERROR");
+            error.put("message", "Failed to download encrypted file");
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
     /**
      * Get decryption details (without downloading)
      * GET /files/{fileId}/decrypt-info
